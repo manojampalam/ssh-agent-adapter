@@ -7,7 +7,7 @@ void process_pipe_connection(connection* con) {
 
 	WSAStartup(MAKEWORD(2, 2), &wsaData);
 	con->sock = socket(AF_INET, SOCK_STREAM, 0);
-
+	ZeroMemory(&serv_addr, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(47010);
 	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -25,12 +25,13 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 	wchar_t pipe_name[MAX_PATH];
 	OVERLAPPED ol;
 
-	swprintf_s(pipe_name, L"\\\\.\\pipe\\usd-2-np-%d", GetCurrentProcessId());
+	swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\usd-2-np-%d", GetCurrentProcessId());
 	ZeroMemory(&ol, sizeof(ol));
 	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	
 	while (1) {
 		connection *con = (connection*)malloc(sizeof(connection));
+		ZeroMemory(con, sizeof(connection));
 		con->pipe = CreateNamedPipeW(
 			pipe_name,		  // pipe name 
 			PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,       // read/write access 
@@ -47,8 +48,6 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 		WaitForSingleObject(ol.hEvent, INFINITE);
 		process_pipe_connection(con);
 	}
-
-
 
     return 0;
 }
