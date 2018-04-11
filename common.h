@@ -17,7 +17,9 @@ typedef struct _connection {
 	HANDLE pipe;
 	SOCKET sock;
 	LONG volatile activity_count;
-
+	HANDLE uds2np_th;
+	HANDLE np2uds_th;
+	int abort_io;
 }connection;
 
 #define BUFSIZE 5*1024

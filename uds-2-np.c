@@ -16,8 +16,8 @@ void process_pipe_connection(connection* con) {
 
 	//start threads
 	con->activity_count = 2;
-	CloseHandle(CreateThread(NULL, 0, uds2np_thread, con, 0, NULL));
-	CloseHandle(CreateThread(NULL, 0, np2uds_thread, con, 0, NULL));
+	con->uds2np_th = CreateThread(NULL, 0, uds2np_thread, con, 0, NULL);
+	con->np2uds_th = CreateThread(NULL, 0, np2uds_thread, con, 0, NULL);
 }
 
 int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
@@ -28,7 +28,7 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 	swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\usd-2-np-%d", GetCurrentProcessId());
 	ZeroMemory(&ol, sizeof(ol));
 	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	
+	printf("pipe: %ls", pipe_name);
 	while (1) {
 		connection *con = (connection*)malloc(sizeof(connection));
 		ZeroMemory(con, sizeof(connection));

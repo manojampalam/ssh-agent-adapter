@@ -4,9 +4,21 @@ static void con_activity_done(connection* con) {
 	if (InterlockedDecrement(&(con->activity_count)) == 0) {
 		CloseHandle(con->pipe);
 		closesocket(con->sock);
+		CloseHandle(con->np2uds_th);
+		CloseHandle(con->uds2np_th);
 		free(con);
 	}
 }
+
+VOID CALLBACK apc_callback(DWORD error, DWORD bytes, LPOVERLAPPED ol) {
+	return;
+}
+
+VOID CALLBACK apc_abortio(ULONG_PTR param) {
+	connection* con = (connection*)param;
+	con->abort_io = 1;
+}
+
 
 DWORD WINAPI uds2np_thread(LPVOID param) {
 	connection* con = (connection*)param;
@@ -14,18 +26,17 @@ DWORD WINAPI uds2np_thread(LPVOID param) {
 	int bytes_read, bytes_written;
 	OVERLAPPED ol;
 
-	ZeroMemory(&ol, sizeof(OVERLAPPED));
-	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	//read from pipe and write to sock
 	while (1) {
+		ZeroMemory(&ol, sizeof(OVERLAPPED));
 		// read from pipe
-		if (!ReadFile(con->pipe, buf, BUFSIZE, NULL, &ol)) {
-			if (GetLastError() != ERROR_IO_PENDING)
-				goto done;
-			WaitForSingleObject(ol.hEvent, INFINITE);
+		if (!ReadFileEx(con->pipe, buf, BUFSIZE, &ol, apc_callback)) {
+			goto done;
 		}
 		
-		if (!GetOverlappedResult(con->pipe, &ol, &bytes_read, FALSE))
+		SleepEx(INFINITE, TRUE);
+		bytes_read = 0;
+		if (con->abort_io || !GetOverlappedResult(con->pipe, &ol, &bytes_read, FALSE))
 			goto done;
 
 		//now write to sock
@@ -39,7 +50,6 @@ DWORD WINAPI uds2np_thread(LPVOID param) {
 	}
 
 done:
-	CancelIo(con->pipe);
 	shutdown(con->sock, SD_SEND);
 	con_activity_done(con);
 	return 0;
@@ -52,8 +62,6 @@ DWORD WINAPI np2uds_thread(LPVOID param) {
 	int bytes_read, bytes_written;
 	OVERLAPPED ol;
 
-	ZeroMemory(&ol, sizeof(OVERLAPPED));
-	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	//read from sock and write to pipe
 	while (1) {
 		// read from sock
@@ -63,25 +71,17 @@ DWORD WINAPI np2uds_thread(LPVOID param) {
 
 		// now write to pipe
 		bytes_written = 0;
-		while (bytes_written < bytes_read) {
-			DWORD written;
-
-			if (!WriteFile(con->pipe, buf + bytes_written, bytes_read - bytes_written, NULL, &ol)) {
-				if (GetLastError() != ERROR_IO_PENDING)
-					goto done;
-				WaitForSingleObject(ol.hEvent, INFINITE);
-			}
-
-			if (!GetOverlappedResult(con->pipe, &ol, &written, FALSE))
-				goto done;
-
-			bytes_written += written;
-		}
-
+		ZeroMemory(&ol, sizeof(OVERLAPPED));
+		if (!WriteFileEx(con->pipe, buf, bytes_read, &ol, apc_callback))
+			goto done;
+			
+		SleepEx(INFINITE, TRUE);
+		if (!GetOverlappedResult(con->pipe, &ol, &bytes_written, FALSE))
+			goto done;
 	}
 
 done:
-	CancelIo(con->pipe);
+	QueueUserAPC(apc_abortio, con->uds2np_th, (ULONG_PTR)con);
 	con_activity_done(con);
 	return 0;
 }

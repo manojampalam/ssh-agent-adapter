@@ -4,7 +4,7 @@
 void process_sock_connection(connection* con) {
 	wchar_t pipe_name[MAX_PATH];
 	
-	swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\ssh-agent");
+	swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\openssh-ssh-agent");
 	con->pipe = CreateFileW(pipe_name,
 		GENERIC_WRITE | GENERIC_READ,
 		0,
@@ -15,8 +15,8 @@ void process_sock_connection(connection* con) {
 
 	//start threads
 	con->activity_count = 2;
-	CloseHandle(CreateThread(NULL, 0, uds2np_thread, con, 0, NULL));
-	CloseHandle(CreateThread(NULL, 0, np2uds_thread, con, 0, NULL));
+	con->uds2np_th = CreateThread(NULL, 0, uds2np_thread, con, 0, NULL);
+	con->np2uds_th = CreateThread(NULL, 0, np2uds_thread, con, 0, NULL);
 }
 
 int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
