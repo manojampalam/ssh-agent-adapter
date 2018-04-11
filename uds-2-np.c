@@ -30,24 +30,26 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 
 	//spawn a child go give back control to cmd
 	if (argc == 1) {
-		char cmdline[MAX_PATH];
-		STARTUPINFOA si;
+		wchar_t cmdline[MAX_PATH];
+		STARTUPINFOW si;
 		PROCESS_INFORMATION pi;
 
 		//read SSH_AUTH_SOCK
-		wchar_t* auth_sock = "filepath";
-		auth_sock = getenv("SSH_AUTH_SOCK");
-		cmdline[0] = '\0';
-		strcat(cmdline, "E:\\temp\\sample.exe");
-		strcat(cmdline, " ");
-		strcat(cmdline, auth_sock);
+		wchar_t* auth_sock = getenv("SSH_AUTH_SOCK");;
+		if (!auth_sock)
+			auth_sock = L"dummyfile";
+		cmdline[0] = L'\0';
+		wcscat(cmdline, L"E:\\temp\\sample.exe");
+		wcscat(cmdline, L" ");
+		wcscat(cmdline, auth_sock);
 		ZeroMemory(&si, sizeof(si));
-		si.cb = sizeof(STARTUPINFO);
+		si.cb = sizeof(STARTUPINFOW);
 		ZeroMemory(&pi, sizeof(pi));
-		CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+		CreateProcessW(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
 		swprintf_s(pipe_name, MAX_PATH, L"SSH_AUTH_SOCK=\\\\.\\pipe\\usd-2-np-%d", pi.dwProcessId);
 		_wputenv(pipe_name);
-		printf("%ls", pipe_name);
+		printf("set %ls", pipe_name);
+		return 0;
 	}
 
 	//TODO - parse contents of file pointed by argv[1]
