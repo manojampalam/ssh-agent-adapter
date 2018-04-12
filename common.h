@@ -12,6 +12,8 @@
 #pragma comment (lib, "AdvApi32.lib")
 #define DEFAULT_BUFLEN 512
 
+extern int debug_mode;
+#define log(...) {if (debug_mode) { printf(__VA_ARGS__); printf("\n");} } 
 
 typedef struct _connection {
 	HANDLE pipe;

@@ -1,6 +1,8 @@
 #include "common.h"
 
 int uds_agent_port = 47010;
+char* cookie = NULL;
+int cookie_len = 0;
 
 void process_pipe_connection(connection* con) {
 	WSADATA wsaData;
@@ -27,21 +29,17 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 {
 	wchar_t pipe_name[MAX_PATH];
 	OVERLAPPED ol;
+	DWORD client_pid;
 
-	//spawn a child go give back control to cmd
+	//spawn a child and give back control to cmd
 	if (argc == 1) {
 		wchar_t cmdline[MAX_PATH];
 		STARTUPINFOW si;
 		PROCESS_INFORMATION pi;
 
-		//read SSH_AUTH_SOCK
-		wchar_t* auth_sock = getenv("SSH_AUTH_SOCK");;
-		if (!auth_sock)
-			auth_sock = L"dummyfile";
 		cmdline[0] = L'\0';
-		wcscat(cmdline, L"E:\\temp\\sample.exe");
-		wcscat(cmdline, L" ");
-		wcscat(cmdline, auth_sock);
+		wcscat(cmdline, argv[0]);
+		wcscat(cmdline, L" -z");
 		ZeroMemory(&si, sizeof(si));
 		si.cb = sizeof(STARTUPINFOW);
 		ZeroMemory(&pi, sizeof(pi));
@@ -51,14 +49,40 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 		printf("set %ls", pipe_name);
 		return 0;
 	}
+	else if (argc > 2 || wcslen(argv[1]) > 2) {
+		printf("wrong usage\n");
+		exit(1);
+	}
+	else {
+		if (wcscmp(argv[1], L"-z") == 0) {
+			//if child mode fall through
+		}
+		else if (wcscmp(argv[1], L"-d") == 0) {
+			//if debug mode fall through
+			debug_mode = 1;
+		}
+		else if (wcscmp(argv[1], L"-k") == 0) {
+			//kill agent
+			printf("kill agent adapter not implemented yet\n");
+			printf("identify agent pid from SSH_AUTH_SOCK (trailing number) and kill it yourself :)\n");
+			exit(1);
+		}
+		else {
+			//unsupported param
+			printf("wrong usage\n");
+			exit(1);
+		}
+	}
 
-	//TODO - parse contents of file pointed by argv[1]
+
+	//TODO - parse contents of file pointed by SSH_AUTH_SOCK env variable
 	// and read port and cookie info
 
 	swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\usd-2-np-%d", GetCurrentProcessId());
 	ZeroMemory(&ol, sizeof(ol));
 	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	printf("pipe: %ls", pipe_name);
+	log("incomig connections to pipe: %ls", pipe_name);
+	log("will be routed to 127.0.0.1:%d", uds_agent_port);
 	while (1) {
 		connection *con = (connection*)malloc(sizeof(connection));
 		ZeroMemory(con, sizeof(connection));
@@ -76,6 +100,8 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 
 		ConnectNamedPipe(con->pipe, &ol);
 		WaitForSingleObject(ol.hEvent, INFINITE);
+		GetNamedPipeClientProcessId(con->pipe, &client_pid);
+		log("connection accepted from pid:%d", client_pid);
 		process_pipe_connection(con);
 	}
 

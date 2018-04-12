@@ -1,5 +1,7 @@
 #include "common.h"
 
+int debug_mode = 0;
+
 static void con_activity_done(connection* con) {
 	if (InterlockedDecrement(&(con->activity_count)) == 0) {
 		CloseHandle(con->pipe);
