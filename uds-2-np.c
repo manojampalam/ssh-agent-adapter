@@ -66,6 +66,7 @@ void process_pipe_connection(connection* con) {
 
 	// write cookie
 	send(con->sock, cookie, (int)cookie_len, 0);
+	// TODO: anything else we need to do for handshake?
 
 	//start threads
 	con->activity_count = 2;
