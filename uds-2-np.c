@@ -36,7 +36,7 @@ errno_t process_sock_file(wchar_t* filename) {
 	if (new_cookie == NULL) {
 		return errno;
 	}
-	err = memcpy_s(new_cookie, clen, buf[i], clen);
+	err = memcpy_s(new_cookie, clen, &buf[i], clen);
 	if (err != 0) {
 		free(new_cookie); new_cookie = NULL;
 		return errno;
@@ -124,7 +124,7 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 		}
 	}
 
-	if ((err =_wgetenv_s(&sock_name_len, &sock_name, MAX_PATH, L"SSH_AUTH_SOCK")) != 0) {
+	if ((err =_wgetenv_s(&sock_name_len, &sock_name, MAX_PATH, L"SSH_AUTH_SOCK")) != 0 || sock_name[0] == 0) {
 		printf("couldn't get original socket path\n");
 		exit(err);
 	}
