@@ -4,6 +4,53 @@ int uds_agent_port = 47010;
 char* cookie = NULL;
 int cookie_len = 0;
 
+errno_t process_sock_file(wchar_t* filename) {
+	#define SHORT_BUFLEN 64
+
+	errno_t err;
+	FILE* sock_file;
+	size_t read_count, i, clen = 0;
+	char buf[SHORT_BUFLEN], *new_cookie = NULL;
+	int port;
+
+	err = _wfopen_s(&sock_file, filename, L"rb");
+	if (err != 0) {
+		return err;
+	}
+	read_count = fread_s(buf, SHORT_BUFLEN, sizeof(char), SHORT_BUFLEN/sizeof(char), sock_file);
+	fclose(sock_file);
+
+	port = atoi(buf);
+	if (port < 1 || port > 65535) {
+		err = errno;
+		return (err != 0) ? err : EINVAL;
+	}
+	uds_agent_port = (UINT)port;
+
+	for (i = read_count; i && buf[i] != '\n'; i--, clen++) {
+		// loop until we hit newline character
+	}
+	i++; clen--; // cookie starts at buf[i] and goes for clen characters
+
+	new_cookie = malloc(clen);
+	if (new_cookie == NULL) {
+		return errno;
+	}
+	err = memcpy_s(new_cookie, clen, buf[i], clen);
+	if (err != 0) {
+		free(new_cookie); new_cookie = NULL;
+		return errno;
+	}
+
+	if (cookie != NULL) {
+		free(cookie); cookie = NULL;
+	}
+	cookie = new_cookie;
+	return 0;
+
+	#undef SHORT_BUFLEN
+}
+
 void process_pipe_connection(connection* con) {
 	WSADATA wsaData;
 	struct sockaddr_in serv_addr;
@@ -27,7 +74,8 @@ void process_pipe_connection(connection* con) {
 
 int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 {
-	wchar_t pipe_name[MAX_PATH];
+	wchar_t pipe_name[MAX_PATH], sock_name[MAX_PATH];
+	errno_t err;
 	OVERLAPPED ol;
 	DWORD client_pid;
 
@@ -74,9 +122,11 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 		}
 	}
 
-
-	//TODO - parse contents of file pointed by SSH_AUTH_SOCK env variable
-	// and read port and cookie info
+	//TODO - get value of SSH_AUTH_SOCK env variable and set as sock_name
+	if ((err = process_sock_file(&sock_name)) != 0) {
+		printf("couldn't access socket %s\n", sock_name);
+		exit(err);
+	}
 
 	swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\usd-2-np-%d", GetCurrentProcessId());
 	ZeroMemory(&ol, sizeof(ol));
