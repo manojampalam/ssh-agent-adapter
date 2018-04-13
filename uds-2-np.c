@@ -64,7 +64,8 @@ void process_pipe_connection(connection* con) {
 
 	connect(con->sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 
-	//TODO - write cookie
+	// write cookie
+	send(con->sock, cookie, (int)cookie_len, 0);
 
 	//start threads
 	con->activity_count = 2;
