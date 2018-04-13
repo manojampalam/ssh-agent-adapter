@@ -75,6 +75,7 @@ void process_pipe_connection(connection* con) {
 int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 {
 	wchar_t pipe_name[MAX_PATH], sock_name[MAX_PATH];
+	size_t sock_name_len;
 	errno_t err;
 	OVERLAPPED ol;
 	DWORD client_pid;
@@ -122,7 +123,10 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 		}
 	}
 
-	//TODO - get value of SSH_AUTH_SOCK env variable and set as sock_name
+	if ((err =_wgetenv_s(&sock_name_len, &sock_name, MAX_PATH, L"SSH_AUTH_SOCK")) != 0) {
+		printf("couldn't get original socket path\n");
+		exit(err);
+	}
 	if ((err = process_sock_file(&sock_name)) != 0) {
 		printf("couldn't access socket %s\n", sock_name);
 		exit(err);
