@@ -54,6 +54,7 @@ errno_t process_sock_file(wchar_t* filename) {
 void process_pipe_connection(connection* con) {
 	WSADATA wsaData;
 	struct sockaddr_in serv_addr;
+	int sc, err;
 
 	WSAStartup(MAKEWORD(2, 2), &wsaData);
 	con->sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -65,8 +66,16 @@ void process_pipe_connection(connection* con) {
 	connect(con->sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 
 	// write cookie
-	send(con->sock, cookie, (int)cookie_len, 0);
-	// TODO: anything else we need to do for handshake?
+	sc = send(con->sock, cookie, (int)cookie_len, 0);
+	if (sc == SOCKET_ERROR) {
+		err = WSAGetLastError();
+		printf("Cookie send failed: %d\n", err);
+		exit(1);
+	}
+	else if (sc < (int)cookie_len) {
+		printf("Only %d bytes of cookie could be sent (length=%d)\n", sc, cookie_len);
+		exit(1);
+	}
 
 	//start threads
 	con->activity_count = 2;
@@ -76,7 +85,9 @@ void process_pipe_connection(connection* con) {
 
 int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 {
-	wchar_t pipe_name[MAX_PATH], sock_name[MAX_PATH];
+	#define MINIBUFLEN 16
+
+	wchar_t pipe_name[MAX_PATH], sock_name[MAX_PATH], errstr[MINIBUFLEN];
 	size_t sock_name_len;
 	errno_t err;
 	OVERLAPPED ol;
@@ -130,14 +141,15 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 		exit(err);
 	}
 	if ((err = process_sock_file(&sock_name)) != 0) {
-		printf("couldn't access socket %s\n", sock_name);
+		_wcserror_s(errstr, MINIBUFLEN, err);
+		printf("couldn't access socket %ls: %ls\n", sock_name, errstr);
 		exit(err);
 	}
 
 	swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\usd-2-np-%d", GetCurrentProcessId());
 	ZeroMemory(&ol, sizeof(ol));
 	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	log("incomig connections to pipe: %ls", pipe_name);
+	log("incoming connections to pipe: %ls", pipe_name);
 	log("will be routed to 127.0.0.1:%d", uds_agent_port);
 	while (1) {
 		connection *con = (connection*)malloc(sizeof(connection));
@@ -159,6 +171,8 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 		GetNamedPipeClientProcessId(con->pipe, &client_pid);
 		log("connection accepted from pid:%d", client_pid);
 		process_pipe_connection(con);
+
+		#undef MINIBUFLEN
 	}
 
     return 0;
