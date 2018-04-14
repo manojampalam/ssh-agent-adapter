@@ -37,3 +37,5 @@ ssh-agent-adapter.VC.db
 int
 bin
 .vs
+*.vcxproj.user
+.vscode
