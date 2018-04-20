@@ -46,6 +46,7 @@ errno_t process_sock_file(wchar_t* filename) {
 		free(cookie); cookie = NULL;
 	}
 	cookie = new_cookie;
+	cookie_len = clen;
 	return 0;
 
 	#undef SHORT_BUFLEN
