@@ -77,6 +77,9 @@ void process_pipe_connection(connection* con) {
 		printf("Only %d bytes of cookie could be sent (length=%d)\n", sc, cookie_len);
 		exit(1);
 	}
+	else {
+		printf("sent cookie to socket (length=%d)\n", sc);
+	}
 
 	//start threads
 	con->activity_count = 2;
