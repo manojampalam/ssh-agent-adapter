@@ -1,4 +1,7 @@
+#include <assert.h>
 #include "common.h"
+
+#define LIBASSUAN_COOKIE_LEN 16
 
 int uds_agent_port = 47010;
 char* cookie = NULL;
@@ -26,11 +29,14 @@ errno_t process_sock_file(wchar_t* filename) {
 		return (err != 0) ? err : EINVAL;
 	}
 	uds_agent_port = (UINT)port;
+	log("gpg-agent is listening on port %d", uds_agent_port);
 
 	for (i = read_count; i && buf[i] != '\n'; i--, clen++) {
 		// loop until we hit newline character
 	}
 	i++; clen--; // cookie starts at buf[i] and goes for clen characters
+	log("cookie starts at charpos %d, length %d", i, read_count - i);
+	assert(clen == LIBASSUAN_COOKIE_LEN && read_count - i == LIBASSUAN_COOKIE_LEN);
 
 	new_cookie = malloc(clen);
 	if (new_cookie == NULL) {
@@ -41,6 +47,7 @@ errno_t process_sock_file(wchar_t* filename) {
 		free(new_cookie); new_cookie = NULL;
 		return errno;
 	}
+	assert(new_cookie[clen - 1] == buf[read_count - 1]);
 
 	if (cookie != NULL) {
 		free(cookie); cookie = NULL;
@@ -73,13 +80,11 @@ void process_pipe_connection(connection* con) {
 		printf("Cookie send failed: %d\n", err);
 		exit(1);
 	}
-	else if (sc < (int)cookie_len) {
-		printf("Only %d bytes of cookie could be sent (length=%d)\n", sc, cookie_len);
+	else if (sc != (int)cookie_len) {
+		printf("Cookie is %d bytes but %d bytes sent!\n", cookie_len, sc);
 		exit(1);
 	}
-	else {
-		printf("sent cookie to socket (length=%d)\n", sc);
-	}
+	log("sent cookie to socket (length=%d)", sc);
 
 	//start threads
 	con->activity_count = 2;
@@ -110,7 +115,7 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 		si.cb = sizeof(STARTUPINFOW);
 		ZeroMemory(&pi, sizeof(pi));
 		CreateProcessW(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
-		swprintf_s(pipe_name, MAX_PATH, L"SSH_AUTH_SOCK=\\\\.\\pipe\\usd-2-np-%d", pi.dwProcessId);
+		swprintf_s(pipe_name, MAX_PATH, L"SSH_AUTH_SOCK=\\\\.\\pipe\\uds-2-np-%d", pi.dwProcessId);
 		_wputenv(pipe_name);
 		printf("set %ls", pipe_name);
 		return 0;
@@ -150,7 +155,7 @@ int wmain(int argc, wchar_t *argv[], wchar_t *envp[])
 		exit(err);
 	}
 
-	swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\usd-2-np-%d", GetCurrentProcessId());
+	swprintf_s(pipe_name, MAX_PATH, L"\\\\.\\pipe\\uds-2-np-%d", GetCurrentProcessId());
 	ZeroMemory(&ol, sizeof(ol));
 	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	log("incoming connections to pipe: %ls", pipe_name);
